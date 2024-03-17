@@ -11,19 +11,29 @@ import (
 	"github.com/google/uuid"
 )
 
+type contextKey string
+
+const (
+	requestIDKey contextKey = "requestID"
+	parentIDKey  contextKey = "parentID"
+	spanIDKey    contextKey = "spanID"
+	fileKey      contextKey = "file"
+	functionKey  contextKey = "function"
+)
+
 func NewTrace(ctx context.Context) context.Context {
-	if ctx.Value("requestID") == nil {
+	if ctx.Value(requestIDKey) == nil {
 		requestID := middleware.GetReqID(ctx)
 		if requestID == "" {
 			requestID = uuid.New().String()
 		}
 
-		ctx = context.WithValue(ctx, "requestID", requestID)
-		ctx = context.WithValue(ctx, "parentID", ctx.Value("requestID"))
-		ctx = context.WithValue(ctx, "spanID", uuid.New().String())
+		ctx = context.WithValue(ctx, requestIDKey, requestID)
+		ctx = context.WithValue(ctx, parentIDKey, ctx.Value(requestIDKey))
+		ctx = context.WithValue(ctx, spanIDKey, uuid.New().String())
 	} else {
-		ctx = context.WithValue(ctx, "parentID", ctx.Value("spanID"))
-		ctx = context.WithValue(ctx, "spanID", uuid.New().String())
+		ctx = context.WithValue(ctx, parentIDKey, ctx.Value(spanIDKey))
+		ctx = context.WithValue(ctx, spanIDKey, uuid.New().String())
 	}
 
 	pc, file, _, ok := runtime.Caller(1)
@@ -33,8 +43,8 @@ func NewTrace(ctx context.Context) context.Context {
 
 	fn := runtime.FuncForPC(pc)
 
-	ctx = context.WithValue(ctx, "file", file)
-	ctx = context.WithValue(ctx, "function", fn.Name())
+	ctx = context.WithValue(ctx, fileKey, file)
+	ctx = context.WithValue(ctx, functionKey, fn.Name())
 
 	return ctx
 }
@@ -42,33 +52,33 @@ func NewTrace(ctx context.Context) context.Context {
 func InfoTrace(ctx context.Context, message string) {
 	slog.Info(
 		message,
-		"requestID", ctx.Value("requestID"),
-		"parentID", ctx.Value("parentID"),
-		"spanID", ctx.Value("spanID"),
-		"file", ctx.Value("file"),
-		"function", ctx.Value("function"),
+		"requestID", ctx.Value(requestIDKey),
+		"parentID", ctx.Value(parentIDKey),
+		"spanID", ctx.Value(spanIDKey),
+		"file", ctx.Value(fileKey),
+		"function", ctx.Value(functionKey),
 	)
 }
 
 func DebugTrace(ctx context.Context, message string) {
 	slog.Debug(
 		message,
-		"requestID", ctx.Value("requestID"),
-		"parentID", ctx.Value("parentID"),
-		"spanID", ctx.Value("spanID"),
-		"file", ctx.Value("file"),
-		"function", ctx.Value("function"),
+		"requestID", ctx.Value(requestIDKey),
+		"parentID", ctx.Value(parentIDKey),
+		"spanID", ctx.Value(spanIDKey),
+		"file", ctx.Value(fileKey),
+		"function", ctx.Value(functionKey),
 	)
 }
 
 func ErrorTrace(ctx context.Context, message string, err error, args ...interface{}) {
 	slog.Error(
 		message,
-		"requestID", ctx.Value("requestID"),
-		"parentID", ctx.Value("parentID"),
-		"spanID", ctx.Value("spanID"),
-		"file", ctx.Value("file"),
-		"function", ctx.Value("function"),
+		"requestID", ctx.Value(requestIDKey),
+		"parentID", ctx.Value(parentIDKey),
+		"spanID", ctx.Value(spanIDKey),
+		"file", ctx.Value(fileKey),
+		"function", ctx.Value(functionKey),
 		"args", args,
 		"error", err,
 	)

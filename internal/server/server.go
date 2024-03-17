@@ -1,6 +1,7 @@
 package server
 
 import (
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -11,7 +12,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/httplog/v2"
-	"github.com/karlbehrensg/chi-clean-template/internal/users"
+	"github.com/karlbehrensg/chi-clean-template/internal/apps/users"
+	"github.com/karlbehrensg/chi-clean-template/utils"
+	_ "github.com/lib/pq"
 )
 
 type Server struct {
@@ -19,6 +22,7 @@ type Server struct {
 	version string
 	env     string
 	port    int
+	db      *sql.DB
 }
 
 func NewServer() *http.Server {
@@ -43,11 +47,23 @@ func NewServer() *http.Server {
 		env = "prod"
 	}
 
+	dbConnString := os.Getenv("DB_CONN_STRING")
+	if dbConnString == "" {
+		slog.Error("DB_CONN_STRING is not set")
+		os.Exit(1)
+	}
+	db, err := utils.NewPostgresClient(dbConnString)
+	if err != nil {
+		slog.Error("Error connecting to Postgres: ", err)
+		os.Exit(1)
+	}
+
 	newServer := &Server{
 		name:    name,
 		version: version,
 		env:     env,
 		port:    port,
+		db:      db,
 	}
 
 	// Declare Server config
@@ -91,7 +107,7 @@ func (s *Server) registerRoutes() http.Handler {
 	r.Use(middleware.Heartbeat("/ping"))
 	r.Use(middleware.Recoverer)
 
-	r.Mount("/users", users.RegisterRoutes())
+	r.Mount("/users", users.RegisterRoutes(s.db))
 
 	return r
 }
